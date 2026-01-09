@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DataVizAI{% endblock %}
+
+{% block extra_head %}
+<!-- Particle.js for dashboard background -->
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Particle Background for Dashboard -->
+<div id="particles-js" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;"></div>
+
+<div class="row reveal">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-gradient"><i class="fas fa-tachometer-alt me-3"></i>Dashboard</h1>
+            <a href="{{ url_for('upload_file') }}" class="cta-button">
+                <i class="fas fa-plus me-2"></i>New Analysis
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 reveal">
+        <div class="card glass feature-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title counter" data-target="{{ total_files }}">{{ total_files }}</h4>
+                        <p class="card-text" style="color: var(--accent-cyan);">Total Files Processed</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-file-csv fa-3x" style="color: var(--accent-cyan); opacity: 0.8;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 reveal">
+        <div class="card glass feature-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title counter" data-target="{{ completed_analyses }}">{{ completed_analyses }}</h4>
+                        <p class="card-text" style="color: var(--accent-cyan);">Completed Analyses</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-3x" style="color: var(--accent-cyan); opacity: 0.8;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 reveal">
+        <div class="card glass feature-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title counter" data-target="{{ ((completed_analyses / total_files * 100) if total_files > 0 else 0) | round(1) }}">{{ ((completed_analyses / total_files * 100) if total_files > 0 else 0) | round(1) }}%</h4>
+                        <p class="card-text" style="color: var(--accent-pink);">Success Rate</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-pie fa-3x" style="color: var(--accent-pink); opacity: 0.8;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sessions -->
+<div class="row">
+    <div class="col-12 reveal">
+        <div class="card glass">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-gradient">
+                    <i class="fas fa-clock me-2"></i>Recent Sessions
+                </h5>
+                {% if recent_sessions %}
+                <small style="color: var(--accent-cyan);">Last {{ recent_sessions|length }} uploads</small>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if recent_sessions %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-file me-1"></i>File</th>
+                                <th><i class="fas fa-calendar me-1"></i>Upload Date</th>
+                                <th><i class="fas fa-database me-1"></i>Dimensions</th>
+                                <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                <th><i class="fas fa-cogs me-1"></i>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in recent_sessions %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-file-{{ 'excel' if session.original_filename.endswith(('.xlsx', '.xls')) else 'csv' }} text-{{ 'success' if session.original_filename.endswith(('.xlsx', '.xls')) else 'info' }} me-2"></i>
+                                        <div>
+                                            <div class="fw-bold">{{ session.original_filename }}</div>
+                                            <small class="text-muted">{{ "%.1f"|format(session.file_size / 1024) }} KB</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span data-bs-toggle="tooltip" title="{{ session.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}">
+                                        {{ session.upload_time.strftime('%Y-%m-%d') }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if session.total_rows and session.total_columns %}
+                                    <span class="badge bg-secondary">
+                                        {{ session.total_rows }} × {{ session.total_columns }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">Unknown</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if session.status == 'completed' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Completed
+                                    </span>
+                                    {% elif session.status == 'processing' %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-spinner fa-spin me-1"></i>Processing
+                                    </span>
+                                    {% elif session.status == 'error' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Error
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-clock me-1"></i>{{ session.status.title() }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        {% if session.status == 'uploaded' %}
+                                        <a href="{{ url_for('configure_schema', session_id=session.id) }}" 
+                                           class="btn btn-outline-primary"
+                                           data-bs-toggle="tooltip" title="Configure Analysis">
+                                            <i class="fas fa-cog"></i>
+                                        </a>
+                                        {% elif session.status == 'completed' %}
+                                        <a href="{{ url_for('view_results', session_id=session.id) }}" 
+                                           class="btn btn-outline-success"
+                                           data-bs-toggle="tooltip" title="View Results">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('generate_report', session_id=session.id, report_type='html') }}" 
+                                           class="btn btn-outline-info"
+                                           data-bs-toggle="tooltip" title="Generate Report">
+                                            <i class="fas fa-file-alt"></i>
+                                        </a>
+                                        {% elif session.status == 'processing' %}
+                                        <button class="btn btn-outline-secondary" disabled
+                                                data-bs-toggle="tooltip" title="Processing in progress">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                        </button>
+                                        {% elif session.status == 'error' %}
+                                        <button class="btn btn-outline-danger" 
+                                                data-bs-toggle="tooltip" title="{{ session.error_message or 'Processing failed' }}">
+                                            <i class="fas fa-info"></i>
+                                        </button>
+                                        {% endif %}
+                                        <a href="{{ url_for('fetch_from_db', session_id=session.id) }}" 
+                                           class="btn btn-outline-warning"
+                                           data-bs-toggle="tooltip" title="Fetch/Restore from DB">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                    <h4 style="color: var(--accent-cyan);">No Data Yet</h4>
+                    <p style="color: rgba(255, 255, 255, 0.7);" class="mb-4">Upload your first survey dataset to get started with AI-powered analysis.</p>
+                    <a href="{{ url_for('upload_file') }}" class="cta-button">
+                        <i class="fas fa-upload me-2"></i>Upload Your First File
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Getting Started Guide -->
+{% if total_files == 0 %}
+<div class="row mt-5">
+    <div class="col-12 reveal">
+        <div class="card glass">
+            <div class="card-header">
+                <h5 class="mb-0 text-gradient">
+                    <i class="fas fa-rocket me-2"></i>Getting Started
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center step-card">
+                        <div class="step-icon" style="margin: 0 auto 1rem;">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <h6 style="color: var(--accent-cyan);">1. Upload Data</h6>
+                        <p style="color: rgba(255, 255, 255, 0.7);">Upload your CSV or Excel survey data file</p>
+                    </div>
+                    <div class="col-md-4 text-center step-card">
+                        <div class="step-icon" style="margin: 0 auto 1rem;">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h6 style="color: var(--accent-cyan);">2. Configure Analysis</h6>
+                        <p style="color: rgba(255, 255, 255, 0.7);">Set up data cleaning and analysis parameters</p>
+                    </div>
+                    <div class="col-md-4 text-center step-card">
+                        <div class="step-icon" style="margin: 0 auto 1rem;">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h6 style="color: var(--accent-cyan);">3. Get Insights</h6>
+                        <p style="color: rgba(255, 255, 255, 0.7);">Receive AI-powered analysis and comprehensive reports</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Auto-refresh for processing status
+    function checkProcessingStatus() {
+        const processingRows = document.querySelectorAll('tr:has(.fa-spinner)');
+        processingRows.forEach(row => {
+            // In a real implementation, you would poll the processing status
+            // For now, we'll just indicate that this functionality exists
+        });
+    }
+    
+    // Check every 30 seconds
+    setInterval(checkProcessingStatus, 30000);
+</script>
+{% endblock %}

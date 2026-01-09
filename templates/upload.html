@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Data - DataVizAI{% endblock %}
+
+{% block extra_head %}
+<!-- Particle.js for upload background -->
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Particle Background for Upload -->
+<div id="particles-js" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;"></div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8 reveal">
+        <div class="card glass">
+            <div class="card-header">
+                <h4 class="mb-0 text-gradient">
+                    <i class="fas fa-upload me-2"></i>Upload Survey Data
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Upload Form -->
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-4">
+                        <label for="file" class="form-label">
+                            <i class="fas fa-file me-2"></i>Select Data File
+                        </label>
+                        <input type="file" 
+                               class="form-control form-control-lg" 
+                               id="file" 
+                               name="file" 
+                               accept=".csv,.xlsx,.xls"
+                               required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Supported formats: CSV (.csv), Excel (.xlsx, .xls). Maximum file size: 16MB
+                        </div>
+                    </div>
+                    
+                    <!-- File Preview Area -->
+                    <div id="filePreview" class="mb-4" style="display: none;">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-eye me-2"></i>File Preview</h6>
+                            <div id="fileInfo"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" class="mb-4" style="display: none;">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            <div class="flex-grow-1">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         id="progressBar" 
+                                         style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted mt-2" id="progressText">Preparing upload...</small>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="cta-button" id="uploadBtn" style="width: 100%;">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>Upload and Analyze
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Features Overview -->
+        <div class="card glass mt-4 reveal">
+            <div class="card-header">
+                <h5 class="mb-0 text-gradient">
+                    <i class="fas fa-star me-2"></i>Analysis Features
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-broom me-2 text-primary"></i>Data Cleaning</h6>
+                        <ul class="list-unstyled ms-3">
+                            <li><i class="fas fa-check text-success me-2"></i>Missing value imputation (mean, median, KNN)</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Outlier detection (IQR, Z-score, winsorization)</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Rule-based validation</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-chart-bar me-2 text-success"></i>Statistical Analysis</h6>
+                        <ul class="list-unstyled ms-3">
+                            <li><i class="fas fa-check text-success me-2"></i>Design weight application</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Weighted summaries with margins of error</li>
+                            <li><i class="fas fa-check text-success me-2"></i>AI-powered insights</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-file-alt me-2 text-info"></i>Report Generation</h6>
+                        <ul class="list-unstyled ms-3">
+                            <li><i class="fas fa-check text-success me-2"></i>PDF and HTML reports</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Workflow logs and diagnostics</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Interactive visualizations</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-robot me-2 text-warning"></i>AI Integration</h6>
+                        <ul class="list-unstyled ms-3">
+                            <li><i class="fas fa-check text-success me-2"></i>Automated pattern detection</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Quality assessment</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Intelligent recommendations</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Privacy Notice -->
+        <div class="card mt-4 border-warning">
+            <div class="card-body">
+                <h6 class="text-warning">
+                    <i class="fas fa-shield-alt me-2"></i>Data Privacy & Security
+                </h6>
+                <p class="mb-0 small text-muted">
+                    Your data is processed securely and is not stored permanently on our servers. 
+                    All uploaded files are automatically deleted after processing is complete. 
+                    We recommend removing any personally identifiable information before upload.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('file');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const filePreview = document.getElementById('filePreview');
+    const fileInfo = document.getElementById('fileInfo');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    
+    // File selection handler
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            displayFilePreview(file);
+        } else {
+            filePreview.style.display = 'none';
+        }
+    });
+    
+    // Form submission handler
+    uploadForm.addEventListener('submit', function(e) {
+        const file = fileInput.files[0];
+        if (!file) {
+            e.preventDefault();
+            alert('Please select a file to upload.');
+            return;
+        }
+        
+        // Validate file size (16MB limit)
+        const maxSize = 16 * 1024 * 1024; // 16MB in bytes
+        if (file.size > maxSize) {
+            e.preventDefault();
+            alert('File size exceeds 16MB limit. Please choose a smaller file.');
+            return;
+        }
+        
+        // Show progress
+        showUploadProgress();
+    });
+    
+    function displayFilePreview(file) {
+        const fileSize = formatFileSize(file.size);
+        const fileType = file.type || 'Unknown';
+        const fileName = file.name;
+        
+        fileInfo.innerHTML = `
+            <div class="row">
+                <div class="col-sm-4"><strong>Name:</strong></div>
+                <div class="col-sm-8">${fileName}</div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4"><strong>Size:</strong></div>
+                <div class="col-sm-8">${fileSize}</div>
+            </div>
+            <div class="row">
+                <div class="col-sm-4"><strong>Type:</strong></div>
+                <div class="col-sm-8">${fileType}</div>
+            </div>
+        `;
+        
+        filePreview.style.display = 'block';
+    }
+    
+    function showUploadProgress() {
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Uploading...';
+        uploadProgress.style.display = 'block';
+        
+        // Simulate progress (in real implementation, you'd track actual upload progress)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 95) {
+                clearInterval(progressInterval);
+                progress = 95;
+                progressText.textContent = 'Processing file...';
+            }
+            
+            progressBar.style.width = progress + '%';
+            
+            if (progress < 50) {
+                progressText.textContent = 'Uploading file...';
+            } else if (progress < 80) {
+                progressText.textContent = 'Validating data...';
+            } else {
+                progressText.textContent = 'Preparing analysis...';
+            }
+        }, 200);
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Drag and drop functionality
+    const fileInputArea = document.querySelector('.card-body');
+    
+    fileInputArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('drag-over');
+    });
+    
+    fileInputArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+    });
+    
+    fileInputArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            displayFilePreview(files[0]);
+        }
+    });
+});
+</script>
+
+<style>
+.drag-over {
+    background-color: var(--bs-primary-bg-subtle);
+    border: 2px dashed var(--bs-primary);
+}
+
+#filePreview .alert {
+    margin-bottom: 0;
+}
+
+.progress {
+    height: 8px;
+}
+
+.form-control:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+</style>
+{% endblock %}

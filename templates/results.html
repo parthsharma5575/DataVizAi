@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Results{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Analysis Results
+                    </h4>
+                    <div>
+                        <span class="badge bg-success">{{ session.status.title() }}</span>
+                        <span class="badge bg-info">{{ session.original_filename }}</span>
+                        <div class="btn-group ms-2" role="group">
+                            <a href="{{ url_for('chat', session_id=session.id) }}" 
+                               class="btn btn-info btn-sm">
+                                <i class="fas fa-comments me-1"></i>Chat Analysis
+                            </a>
+                            <a href="{{ url_for('generate_report', session_id=session.id, report_type='pdf') }}" 
+                               class="btn btn-danger btn-sm">
+                                <i class="fas fa-file-pdf me-1"></i>Download PDF
+                            </a>
+                            <a href="{{ url_for('generate_report', session_id=session.id, report_type='html') }}" 
+                               class="btn btn-primary btn-sm">
+                                <i class="fas fa-file-code me-1"></i>Download HTML
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Summary Statistics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-database fa-2x mb-2"></i>
+                                    <h5>{{ session.total_rows }}</h5>
+                                    <small>Records Processed</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                    <h5>{{ session.missing_values_count or 0 }}</h5>
+                                    <small>Missing Values</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-search fa-2x mb-2"></i>
+                                    <h5>{{ session.outliers_detected or 0 }}</h5>
+                                    <small>Outliers Detected</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                    <h5>{{ session.total_columns }}</h5>
+                                    <small>Variables Analyzed</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistical Summary -->
+                    {% if results_data and results_data.summary_stats %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-calculator me-2"></i>Statistical Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Variable</th>
+                                            <th>Mean</th>
+                                            <th>Median</th>
+                                            <th>Std Dev</th>
+                                            <th>Min</th>
+                                            <th>Max</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for var, stats in results_data.summary_stats.items() %}
+                                        {% if stats.get('mean') is not none %}
+                                        <tr>
+                                            <td><strong>{{ var }}</strong></td>
+                                            <td>{{ "%.2f"|format(stats.get('mean', 0)) }}</td>
+                                            <td>{{ "%.2f"|format(stats.get('median', 0)) }}</td>
+                                            <td>{{ "%.2f"|format(stats.get('std', 0)) }}</td>
+                                            <td>{{ "%.2f"|format(stats.get('min', 0)) }}</td>
+                                            <td>{{ "%.2f"|format(stats.get('max', 0)) }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- AI Insights -->
+                    {% if results_data and results_data.ai_insights and results_data.ai_insights.insights %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-brain me-2"></i>AI Generated Insights</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% if results_data.ai_insights.insights.key_findings %}
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-lightbulb me-1"></i>Key Findings</h6>
+                                    <ul class="list-unstyled">
+                                        {% for finding in results_data.ai_insights.insights.key_findings %}
+                                        <li class="mb-2">
+                                            <i class="fas fa-arrow-right text-primary me-1"></i>
+                                            {{ finding }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                {% if results_data.ai_insights.insights.recommended_actions %}
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-star me-1"></i>Recommended Actions</h6>
+                                    <ul class="list-unstyled">
+                                        {% for rec in results_data.ai_insights.insights.recommended_actions %}
+                                        <li class="mb-2">
+                                            <i class="fas fa-check text-success me-1"></i>
+                                            {{ rec }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            {% if results_data.ai_insights.insights.data_quality_assessment %}
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="fas fa-info-circle me-1"></i>Data Quality Assessment</h6>
+                                <p class="mb-0">{{ results_data.ai_insights.insights.data_quality_assessment }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if results_data.ai_insights.insights.statistical_summary %}
+                            <div class="alert alert-light mt-3">
+                                <h6><i class="fas fa-chart-bar me-1"></i>Statistical Summary</h6>
+                                <p class="mb-0">{{ results_data.ai_insights.insights.statistical_summary }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if results_data.ai_insights.insights.potential_issues %}
+                            <div class="alert alert-warning mt-3">
+                                <h6><i class="fas fa-exclamation-triangle me-1"></i>Potential Issues</h6>
+                                <ul class="list-unstyled mb-0">
+                                    {% for issue in results_data.ai_insights.insights.potential_issues %}
+                                    <li class="mb-1">
+                                        <i class="fas fa-warning text-warning me-1"></i>
+                                        {{ issue }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% elif results_data and results_data.ai_insights %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-brain me-2"></i>AI Generated Insights</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-info-circle me-1"></i>Insights Status</h6>
+                                <p class="mb-0">Insights are being generated. Please refresh the page in a moment or check if the AI is properly configured.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Validation Results -->
+                    {% if results_data and results_data.validation_results %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-shield-alt me-2"></i>Data Validation Results</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% if results_data.validation_results.errors %}
+                                <div class="col-md-4">
+                                    <h6 class="text-danger"><i class="fas fa-times-circle me-1"></i>Errors</h6>
+                                    <ul class="list-unstyled">
+                                        {% for error in results_data.validation_results.errors %}
+                                        <li><small class="text-danger">✗ {{ error }}</small></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                {% if results_data.validation_results.warnings %}
+                                <div class="col-md-6">
+                                    <h6 class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Warnings</h6>
+                                    <ul class="list-unstyled">
+                                        {% for warning in results_data.validation_results.warnings %}
+                                        <li><small class="text-warning">⚠ {{ warning }}</small></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                {% if not results_data.validation_results.errors and not results_data.validation_results.warnings %}
+                                <div class="col-12">
+                                    <div class="alert alert-success">
+                                        <h6 class="text-success"><i class="fas fa-check-circle me-1"></i>All Checks Passed</h6>
+                                        <p class="mb-0">Data validation completed successfully with no issues detected.</p>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Processing Log -->
+                    {% if processing_logs %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-list me-2"></i>Processing Log</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Step</th>
+                                            <th>Status</th>
+                                            <th>Start Time</th>
+                                            <th>End Time</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in processing_logs %}
+                                        <tr>
+                                            <td>{{ log.step_name }}</td>
+                                            <td>
+                                                {% if log.step_status == 'completed' %}
+                                                <span class="badge bg-success">{{ log.step_status.title() }}</span>
+                                                {% elif log.step_status == 'failed' %}
+                                                <span class="badge bg-danger">{{ log.step_status.title() }}</span>
+                                                {% else %}
+                                                <span class="badge bg-warning">{{ log.step_status.title() }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><small>{{ log.start_time.strftime('%H:%M:%S') if log.start_time else 'N/A' }}</small></td>
+                                            <td><small>{{ log.end_time.strftime('%H:%M:%S') if log.end_time else 'N/A' }}</small></td>
+                                            <td><small>{{ log.log_message or '' }}</small></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Download Section -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-download me-2"></i>Download Options</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Primary Download: Cleaned Data -->
+                            <div class="mb-4">
+                                <h6 class="text-muted mb-3">Processed Data</h6>
+                                <a href="{{ url_for('download_cleaned_data', session_id=session.id) }}" 
+                                   class="btn btn-success btn-lg w-100 d-flex align-items-center justify-content-center">
+                                    <i class="fas fa-download me-3"></i>
+                                    <div class="text-start">
+                                        <div><strong>Download Cleaned Data</strong></div>
+                                        <small class="text-light">Your processed dataset ({{ session.original_filename }})</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Reports Downloads -->
+                            <div>
+                                <h6 class="text-muted mb-3">Analysis Reports</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <a href="{{ url_for('generate_report', session_id=session.id, report_type='pdf') }}" 
+                                           class="btn btn-outline-danger w-100">
+                                            <i class="fas fa-file-pdf me-2"></i>PDF Report
+                                        </a>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <a href="{{ url_for('generate_report', session_id=session.id, report_type='html') }}" 
+                                           class="btn btn-outline-info w-100">
+                                            <i class="fas fa-file-code me-2"></i>HTML Report
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-home me-2"></i>
+                            Back to Dashboard
+                        </a>
+                        <a href="{{ url_for('upload_file') }}" class="btn btn-outline-success">
+                            <i class="fas fa-upload me-2"></i>
+                            Upload New File
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

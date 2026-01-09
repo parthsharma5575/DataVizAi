@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Data Analysis Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2.5rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 20px 20px;
+        }
+        .at-a-glance {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 2rem 0;
+            margin: -2rem 0 3rem 0;
+            border-radius: 15px;
+        }
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            border-radius: 12px;
+            transition: transform 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        .card-header {
+            border-bottom: 2px solid #e9ecef;
+            border-radius: 12px 12px 0 0 !important;
+            background-color: #f8f9fa;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 2rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+        }
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .chart-container {
+            text-align: center;
+            padding: 1.5rem;
+        }
+        .insight-item {
+            border-left: 4px solid #667eea;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+        .quality-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .quality-excellent { background-color: #28a745; }
+        .quality-good { background-color: #ffc107; }
+        .quality-poor { background-color: #dc3545; }
+        .section-icon {
+            color: #667eea;
+            margin-right: 8px;
+        }
+        .collapsible-content {
+            transition: all 0.3s ease;
+        }
+        .badge-custom {
+            font-size: 0.8rem;
+            padding: 0.5rem 0.8rem;
+        }
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .metadata-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .correlation-matrix {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        .outlier-summary {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .download-buttons {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .download-btn {
+            margin-bottom: 0.5rem;
+            border-radius: 25px;
+        }
+        @media print {
+            .report-header, .at-a-glance, .stat-card {
+                background: #667eea !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .download-buttons {
+                display: none;
+            }
+        }
+        @media (max-width: 768px) {
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+            .download-buttons {
+                position: relative;
+                margin-bottom: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Download Buttons -->
+    <div class="download-buttons d-none d-lg-block">
+        <div class="d-flex flex-column">
+            <button class="btn btn-primary download-btn" onclick="window.print()">
+                <i class="fas fa-download"></i> Download PDF
+            </button>
+            <button class="btn btn-outline-primary download-btn" onclick="downloadHTML()">
+                <i class="fas fa-file-code"></i> Save HTML
+            </button>
+        </div>
+    </div>
+
+    <!-- Report Header with Metadata -->
+    <div class="report-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="display-3 fw-bold">
+                        <i class="fas fa-chart-line me-3"></i>Survey Data Analysis Report
+                    </h1>
+                    <p class="lead fs-5 mb-1">{{ report_data.session.original_filename }}</p>
+                    <p class="mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>Generated on {{ timestamp.strftime('%B %d, %Y at %I:%M %p') }}
+                        <span class="ms-3"><i class="fas fa-user me-2"></i>Report ID: {{ report_data.session.id }}</span>
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="text-white-50 small">
+                        <div><i class="fas fa-upload me-2"></i>Uploaded: {{ report_data.session.upload_time.strftime('%m/%d/%Y %H:%M') }}</div>
+                        <div><i class="fas fa-database me-2"></i>Size: {{ (report_data.session.file_size / 1024) | round(1) if report_data.session.file_size else 0 }} KB</div>
+                        <div><i class="fas fa-check-circle me-2"></i>Status: {{ report_data.session.status.title() }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- At-a-Glance Dashboard -->
+    <div class="container">
+        <div class="at-a-glance">
+            <div class="container">
+                <div class="row text-center">
+                    <div class="col-12 mb-3">
+                        <h2 class="fw-bold"><i class="fas fa-tachometer-alt me-2"></i>At-a-Glance Dashboard</h2>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">{{ report_data.session.total_rows or 0 }}</div>
+                        <small>Total Records</small>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">{{ report_data.session.total_columns or 0 }}</div>
+                        <small>Variables</small>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">
+                            {% if report_data.results.quality_score %}
+                                {{ (report_data.results.quality_score.values() | list | sum / report_data.results.quality_score.values() | list | length) | round(1) }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </div>
+                        <small>Data Quality</small>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">
+                            {% if report_data.results.summary_stats %}
+                                {{ report_data.results.summary_stats.keys() | list | length }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </div>
+                        <small>Processed Columns</small>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">
+                            {% if report_data.results.ai_insights and report_data.results.ai_insights.insights and report_data.results.ai_insights.insights.key_findings %}
+                                {{ report_data.results.ai_insights.insights.key_findings | length }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </div>
+                        <small>Key Insights</small>
+                    </div>
+                    <div class="col-md-2 col-6">
+                        <div class="h2 fw-bold">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                        </div>
+                        <small>Warnings</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Data Overview Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-database section-icon"></i>Data Overview & Schema
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Dataset Metadata -->
+                        <div class="metadata-grid">
+                            <div class="metadata-item">
+                                <div class="fw-bold text-muted small">DATASET SIZE</div>
+                                <div class="fs-4 text-primary">{{ "{:,}".format(report_data.session.total_rows or 0) }} × {{ report_data.session.total_columns or 0 }}</div>
+                                <div class="small text-muted">rows × columns</div>
+                            </div>
+                            <div class="metadata-item">
+                                <div class="fw-bold text-muted small">FILE SIZE</div>
+                                <div class="fs-4 text-success">{{ (report_data.session.file_size / 1024) | round(1) if report_data.session.file_size else 0 }} KB</div>
+                                <div class="small text-muted">{{ "{:,}".format(report_data.session.file_size or 0) }} bytes</div>
+                            </div>
+                            <div class="metadata-item">
+                                <div class="fw-bold text-muted small">UPLOAD TIME</div>
+                                <div class="fs-4 text-info">{{ report_data.session.upload_time.strftime('%H:%M') }}</div>
+                                <div class="small text-muted">{{ report_data.session.upload_time.strftime('%B %d, %Y') }}</div>
+                            </div>
+                            <div class="metadata-item">
+                                <div class="fw-bold text-muted small">PROCESSING STATUS</div>
+                                <div class="fs-4">
+                                    {% if report_data.session.status == 'completed' %}
+                                        <span class="text-success"><i class="fas fa-check-circle me-1"></i>Completed</span>
+                                    {% elif report_data.session.status == 'failed' %}
+                                        <span class="text-danger"><i class="fas fa-times-circle me-1"></i>Failed</span>
+                                    {% else %}
+                                        <span class="text-warning"><i class="fas fa-clock me-1"></i>{{ report_data.session.status.title() }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Schema Preview -->
+                        {% if report_data.results.summary_stats %}
+                        <div class="row">
+                            <div class="col-12">
+                                <h4 class="mb-3"><i class="fas fa-table me-2"></i>Data Schema & Quality Summary</h4>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Column Name</th>
+                                                <th>Data Type</th>
+                                                <th>Skewness</th>
+                                                <th>Missing %</th>
+                                                <th>Example Values</th>
+                                                <th>Quality</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for col_name, stats in report_data.results.summary_stats.items() %}
+                                            <tr>
+                                                <td><strong>{{ col_name }}</strong></td>
+                                                <td>
+                                                    {% if 'mean' in stats %}
+                                                        <span class="badge bg-primary badge-custom">
+                                                            <i class="fas fa-hashtag me-1"></i>Numeric
+                                                        </span>
+                                                    {% elif 'unique' in stats %}
+                                                        <span class="badge bg-success badge-custom">
+                                                            <i class="fas fa-font me-1"></i>Categorical
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary badge-custom">
+                                                            <i class="fas fa-question me-1"></i>Other
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if 'skew' in stats %}
+                                                        {{ "%.2f" | format(stats.skew) }}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if 'missing_pct' in stats %}
+                                                        {% set missing_pct = stats.missing_pct %}
+                                                        {% if missing_pct <= 5 %}
+                                                            <span class="quality-indicator quality-excellent"></span>{{ "%.1f" | format(missing_pct) }}%
+                                                        {% elif missing_pct <= 20 %}
+                                                            <span class="quality-indicator quality-good"></span>{{ "%.1f" | format(missing_pct) }}%
+                                                        {% else %}
+                                                            <span class="quality-indicator quality-poor"></span>{{ "%.1f" | format(missing_pct) }}%
+                                                        {% endif %}
+                                                    {% else %}
+                                                        0%
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-muted small">
+                                                    {% if 'top' in stats %}
+                                                        "{{ stats.top }}"{% if stats.unique > 1 %}, ...{% endif %}
+                                                    {% elif 'mean' in stats %}
+                                                        {{ "%.2f" | format(stats.min) }} - {{ "%.2f" | format(stats.max) }}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if 'missing_pct' in stats and stats.missing_pct <= 5 %}
+                                                        <i class="fas fa-check text-success" title="Excellent quality"></i>
+                                                    {% elif 'missing_pct' in stats and stats.missing_pct <= 20 %}
+                                                        <i class="fas fa-exclamation text-warning" title="Good quality"></i>
+                                                    {% else %}
+                                                        <i class="fas fa-times text-danger" title="Needs attention"></i>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Quality & Validation Section -->
+        {% if report_data.results.quality_score %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-shield-alt section-icon"></i>Data Quality & Validation
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Quality Metrics Dashboard -->
+                        <div class="row mb-4">
+                            {% for metric, score in report_data.results.quality_score.items() %}
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body text-center p-3">
+                                        <div class="display-6 fw-bold 
+                                            {% if score >= 80 %}text-success
+                                            {% elif score >= 60 %}text-warning
+                                            {% else %}text-danger
+                                            {% endif %}">
+                                            {{ "%.1f" | format(score) }}%
+                                        </div>
+                                        <div class="text-muted small">{{ metric.replace('_', ' ').title() }}</div>
+                                        <div class="progress mt-2" style="height: 4px;">
+                                            <div class="progress-bar 
+                                                {% if score >= 80 %}bg-success
+                                                {% elif score >= 60 %}bg-warning
+                                                {% else %}bg-danger
+                                                {% endif %}" 
+                                                style="width: {{ score }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Validation Checks Summary -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-check-circle text-success me-2"></i>Validation Checks Passed</h5>
+                                <ul class="list-unstyled">
+                                    {% set total_cols = report_data.session.total_columns or 0 %}
+                                    {% if total_cols > 0 %}
+                                        <li><i class="fas fa-check text-success me-2"></i>Data structure integrity verified</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Column data types detected</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Missing value patterns analyzed</li>
+                                    {% endif %}
+                                    {% if report_data.results.summary_stats %}
+                                        <li><i class="fas fa-check text-success me-2"></i>Statistical analysis completed</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5><i class="fas fa-exclamation-triangle text-warning me-2"></i>Areas for Attention</h5>
+                                <ul class="list-unstyled">
+                                    {% set high_missing_cols = [] %}
+                                    {% if report_data.results.summary_stats %}
+                                        {% for col_name, stats in report_data.results.summary_stats.items() %}
+                                            {% if 'missing_pct' in stats and stats.missing_pct > 20 %}
+                                                {% set _ = high_missing_cols.append(col_name) %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    
+                                    {% if high_missing_cols %}
+                                        <li><i class="fas fa-exclamation text-warning me-2"></i>{{ high_missing_cols | length }} columns with >20% missing data</li>
+                                    {% else %}
+                                        <li><i class="fas fa-check text-success me-2"></i>No columns with excessive missing data</li>
+                                    {% endif %}
+                                    
+                                    {% if report_data.session.total_columns and report_data.session.total_columns > 50 %}
+                                        <li><i class="fas fa-exclamation text-warning me-2"></i>High dimensionality dataset ({{ report_data.session.total_columns }} columns)</li>
+                                    {% else %}
+                                        <li><i class="fas fa-check text-success me-2"></i>Manageable number of variables</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Descriptive Statistics Section -->
+        {% if report_data.results.summary_stats %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-chart-bar section-icon"></i>Descriptive Statistics
+                        </h2>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#statsDetails" aria-expanded="false">
+                            <i class="fas fa-chevron-down me-1"></i>Toggle Details
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Numeric Columns Statistics -->
+                        {% set numeric_cols = [] %}
+                        {% set categorical_cols = [] %}
+                        {% for col_name, stats in report_data.results.summary_stats.items() %}
+                            {% if 'mean' in stats %}
+                                {% set _ = numeric_cols.append((col_name, stats)) %}
+                            {% elif 'unique' in stats %}
+                                {% set _ = categorical_cols.append((col_name, stats)) %}
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if numeric_cols %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4><i class="fas fa-hashtag me-2"></i>Numeric Variables ({{ numeric_cols | length }})</h4>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Variable</th>
+                                                <th>Count</th>
+                                                <th>Mean</th>
+                                                <th>Std Dev</th>
+                                                <th>Min</th>
+                                                <th>25%</th>
+                                                <th>Median</th>
+                                                <th>75%</th>
+                                                <th>Max</th>
+                                                <th>Skewness</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for col_name, stats in numeric_cols %}
+                                            <tr>
+                                                <td><strong>{{ col_name }}</strong></td>
+                                                <td>{{ stats.count if 'count' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats.mean) if 'mean' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats.std) if 'std' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats.min) if 'min' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats['25%']) if '25%' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats['50%']) if '50%' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats['75%']) if '75%' in stats else 'N/A' }}</td>
+                                                <td>{{ "%.2f" | format(stats.max) if 'max' in stats else 'N/A' }}</td>
+                                                <td>
+                                                    {% if 'skew' in stats %}
+                                                        {% set skew = stats.skew %}
+                                                        <span class="badge 
+                                                            {% if skew | abs < 0.5 %}bg-success
+                                                            {% elif skew | abs < 1 %}bg-warning
+                                                            {% else %}bg-danger
+                                                            {% endif %}">
+                                                            {{ "%.2f" | format(skew) }}
+                                                        </span>
+                                                    {% else %}N/A{% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if categorical_cols %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4><i class="fas fa-tags me-2"></i>Categorical Variables ({{ categorical_cols | length }})</h4>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Variable</th>
+                                                <th>Count</th>
+                                                <th>Unique Values</th>
+                                                <th>Mode</th>
+                                                <th>Mode Frequency</th>
+                                                <th>Diversity Index</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for col_name, stats in categorical_cols %}
+                                            <tr>
+                                                <td><strong>{{ col_name }}</strong></td>
+                                                <td>{{ stats.count if 'count' in stats else 'N/A' }}</td>
+                                                <td>{{ stats.unique if 'unique' in stats else 'N/A' }}</td>
+                                                <td>{{ stats.top if 'top' in stats else 'N/A' }}</td>
+                                                <td>{{ stats.freq if 'freq' in stats else 'N/A' }}</td>
+                                                <td>
+                                                    {% if 'unique' in stats and 'count' in stats %}
+                                                        {% set diversity = (stats.unique / stats.count * 100) %}
+                                                        <span class="badge 
+                                                            {% if diversity > 80 %}bg-info
+                                                            {% elif diversity > 50 %}bg-success
+                                                            {% elif diversity > 20 %}bg-warning
+                                                            {% else %}bg-secondary
+                                                            {% endif %}">
+                                                            {{ "%.1f" | format(diversity) }}%
+                                                        </span>
+                                                    {% else %}N/A{% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Data Visualizations Section -->
+        {% if charts %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-chart-pie section-icon"></i>Data Visualizations
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% if charts.missing_values %}
+                            <div class="col-lg-6 mb-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-transparent border-0">
+                                        <h5 class="card-title mb-0">
+                                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>Missing Values Analysis
+                                        </h5>
+                                    </div>
+                                    <div class="card-body chart-container">
+                                        {% if charts.missing_values.image is defined %}
+                                            <img src="{{ charts.missing_values.image }}" alt="Missing Values Chart" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-3 p-2 bg-white border-start border-primary border-4 text-start">
+                                                <p class="mb-0 small text-muted">{{ charts.missing_values.explanation }}</p>
+                                            </div>
+                                        {% else %}
+                                            <img src="{{ charts.missing_values }}" alt="Missing Values Chart" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-2">
+                                                <small class="text-muted">Shows count of missing values per column</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if charts.data_types %}
+                            <div class="col-lg-6 mb-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-transparent border-0">
+                                        <h5 class="card-title mb-0">
+                                            <i class="fas fa-database text-info me-2"></i>Data Types Distribution
+                                        </h5>
+                                    </div>
+                                    <div class="card-body chart-container">
+                                        {% if charts.data_types.image is defined %}
+                                            <img src="{{ charts.data_types.image }}" alt="Data Types Chart" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-3 p-2 bg-white border-start border-primary border-4 text-start">
+                                                <p class="mb-0 small text-muted">{{ charts.data_types.explanation }}</p>
+                                            </div>
+                                        {% else %}
+                                            <img src="{{ charts.data_types }}" alt="Data Types Chart" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-2">
+                                                <small class="text-muted">Distribution of numeric vs categorical variables</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if charts.correlation_matrix %}
+                            <div class="col-12 mb-4">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-transparent border-0">
+                                        <h5 class="card-title mb-0">
+                                            <i class="fas fa-project-diagram text-success me-2"></i>Correlation Matrix
+                                        </h5>
+                                    </div>
+                                    <div class="card-body chart-container correlation-matrix">
+                                        {% if charts.correlation_matrix.image is defined %}
+                                            <img src="{{ charts.correlation_matrix.image }}" alt="Correlation Matrix" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-3 p-2 bg-white border-start border-primary border-4 text-start">
+                                                <p class="mb-0 small text-muted">{{ charts.correlation_matrix.explanation }}</p>
+                                            </div>
+                                        {% else %}
+                                            <img src="{{ charts.correlation_matrix }}" alt="Correlation Matrix" class="img-fluid" style="border-radius: 8px;">
+                                            <div class="mt-2">
+                                                <small class="text-muted">Correlation relationships between numeric variables</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- AI-Powered Insights Section -->
+        {% if report_data.results.ai_insights and report_data.results.ai_insights.insights %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-brain section-icon"></i>AI-Powered Insights & Recommendations
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        {% set insights = report_data.results.ai_insights.insights %}
+                        
+                        <!-- Key Findings -->
+                        {% if insights.key_findings %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4><i class="fas fa-lightbulb text-warning me-2"></i>Key Findings</h4>
+                                <div class="row">
+                                    {% for finding in insights.key_findings[:6] %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="insight-item">
+                                            <i class="fas fa-arrow-right text-primary me-2"></i>{{ finding }}
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Outlier Detection Summary -->
+                        {% if insights.outlier_summary or insights.anomaly_detection %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4><i class="fas fa-exclamation-circle text-danger me-2"></i>Outlier & Anomaly Detection</h4>
+                                <div class="outlier-summary">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="fw-bold mb-2">Detection Methods Applied:</div>
+                                            <ul class="mb-2">
+                                                <li>Statistical Z-score analysis (threshold: ±3σ)</li>
+                                                <li>Interquartile Range (IQR) method</li>
+                                                <li>Isolation Forest algorithm</li>
+                                            </ul>
+                                            {% if insights.outlier_summary %}
+                                                <div class="small">{{ insights.outlier_summary }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-4 text-end">
+                                            <div class="display-6 fw-bold">
+                                                {% if insights.outlier_count %}{{ insights.outlier_count }}{% else %}0{% endif %}
+                                            </div>
+                                            <div class="small">Outliers Detected</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Data Quality Assessment -->
+                        {% if insights.data_quality_assessment %}
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h4><i class="fas fa-shield-alt text-success me-2"></i>Data Quality Assessment</h4>
+                                <div class="insight-item">
+                                    <i class="fas fa-quote-left text-muted me-2"></i>{{ insights.data_quality_assessment }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Actionable Recommendations -->
+                        {% if insights.recommended_actions %}
+                        <div class="row">
+                            <div class="col-12">
+                                <h4><i class="fas fa-tasks text-info me-2"></i>Actionable Recommendations</h4>
+                                <div class="row">
+                                    {% for action in insights.recommended_actions[:8] %}
+                                    <div class="col-md-6 col-lg-4 mb-3">
+                                        <div class="card border-left-info h-100">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-start">
+                                                    <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                                                    <div class="small">{{ action }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Feature Engineering Ideas -->
+                        {% if insights.feature_engineering_ideas %}
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-cogs text-secondary me-2"></i>Feature Engineering Suggestions</h5>
+                                        <div class="row">
+                                            {% for idea in insights.feature_engineering_ideas[:4] %}
+                                            <div class="col-md-6 mb-2">
+                                                <div class="small text-muted">
+                                                    <i class="fas fa-arrow-right me-1"></i>{{ idea }}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+
+
+        <!-- Processing Log Section -->
+        {% if report_data.processing_logs %}
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="card-title mb-0">
+                            <i class="fas fa-history section-icon"></i>Processing Log & Timeline
+                        </h2>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#processingLogDetails" aria-expanded="false">
+                            <i class="fas fa-chevron-down me-1"></i>Show Details
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Processing Summary -->
+                        <div class="row mb-4">
+                            {% set completed_steps = report_data.processing_logs | selectattr('step_status', 'equalto', 'completed') | list %}
+                            {% set failed_steps = report_data.processing_logs | selectattr('step_status', 'equalto', 'failed') | list %}
+                            {% set total_steps = report_data.processing_logs | list | length %}
+                            
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="display-6 fw-bold text-success">{{ completed_steps | length }}</div>
+                                    <div class="small text-muted">Steps Completed</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="display-6 fw-bold text-danger">{{ failed_steps | length }}</div>
+                                    <div class="small text-muted">Steps Failed</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="display-6 fw-bold text-primary">{{ total_steps }}</div>
+                                    <div class="small text-muted">Total Steps</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <div class="display-6 fw-bold text-info">
+                                        {% if total_steps > 0 %}{{ (completed_steps | length / total_steps * 100) | round(0) | int }}%{% else %}0%{% endif %}
+                                    </div>
+                                    <div class="small text-muted">Success Rate</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Processing Log -->
+                        <div class="collapse" id="processingLogDetails">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th><i class="fas fa-tasks me-1"></i>Step</th>
+                                            <th><i class="fas fa-flag me-1"></i>Status</th>
+                                            <th><i class="fas fa-clock me-1"></i>Start Time</th>
+                                            <th><i class="fas fa-stopwatch me-1"></i>Duration</th>
+                                            <th><i class="fas fa-info-circle me-1"></i>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in report_data.processing_logs %}
+                                        <tr class="
+                                            {% if log.step_status == 'completed' %}table-success-light
+                                            {% elif log.step_status == 'failed' %}table-danger-light
+                                            {% else %}table-warning-light
+                                            {% endif %}">
+                                            <td>
+                                                <strong>{{ log.step_name.replace('_', ' ').title() }}</strong>
+                                            </td>
+                                            <td>
+                                                {% if log.step_status == 'completed' %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check me-1"></i>{{ log.step_status.title() }}
+                                                    </span>
+                                                {% elif log.step_status == 'failed' %}
+                                                    <span class="badge bg-danger">
+                                                        <i class="fas fa-times me-1"></i>{{ log.step_status.title() }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-clock me-1"></i>{{ log.step_status.title() }}
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ log.start_time.strftime('%H:%M:%S') if log.start_time else 'N/A' }}</td>
+                                            <td>
+                                                {% if log.start_time and log.end_time %}
+                                                    {% set duration = log.end_time - log.start_time %}
+                                                    {% if duration.total_seconds() < 60 %}
+                                                        {{ "%.1f" | format(duration.total_seconds()) }}s
+                                                    {% else %}
+                                                        {{ "%.1f" | format(duration.total_seconds() / 60) }}m
+                                                    {% endif %}
+                                                {% else %}
+                                                    N/A
+                                                {% endif %}
+                                            </td>
+                                            <td class="small">
+                                                {% if log.log_message %}
+                                                    {% if log.log_message|length > 100 %}
+                                                        <span title="{{ log.log_message }}">{{ log.log_message[:100] }}...</span>
+                                                    {% else %}
+                                                        {{ log.log_message }}
+                                                    {% endif %}
+                                                {% else %}
+                                                    No additional details
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Export & Download Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card bg-gradient-primary text-white">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h3><i class="fas fa-download me-2"></i>Export & Share Report</h3>
+                                <p class="mb-0">Download this report in multiple formats or share with your team</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-light" onclick="window.print()">
+                                        <i class="fas fa-file-pdf me-1"></i>PDF
+                                    </button>
+                                    <button type="button" class="btn btn-outline-light" onclick="downloadHTML()">
+                                        <i class="fas fa-file-code me-1"></i>HTML
+                                    </button>
+                                    <button type="button" class="btn btn-outline-light" onclick="shareReport()" title="Copy link to clipboard">
+                                        <i class="fas fa-share me-1"></i>Share
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="row">
+            <div class="col-12 text-center">
+                <hr class="my-4">
+                <div class="row">
+                    <div class="col-md-4 text-md-start text-center">
+                        <div class="text-muted small">
+                            <i class="fas fa-chart-line me-1"></i>Survey Data Analysis Platform
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="text-muted small">
+                            Generated {{ timestamp.strftime('%B %d, %Y at %I:%M %p') }}
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end text-center">
+                        <div class="text-muted small">
+                            Report ID: {{ report_data.session.id }} | Version 2.0
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Enhanced interactivity for the report
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+
+            // Add search functionality to tables
+            addTableSearch();
+            
+            // Initialize collapsible sections
+            initializeCollapsibles();
+        });
+
+        function addTableSearch() {
+            const tables = document.querySelectorAll('.table-responsive table');
+            tables.forEach(table => {
+                const tableContainer = table.closest('.card-body');
+                if (tableContainer && !tableContainer.querySelector('.table-search')) {
+                    const searchDiv = document.createElement('div');
+                    searchDiv.className = 'table-search mb-3';
+                    searchDiv.innerHTML = `
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Search in table..." 
+                                   onkeyup="filterTable(this, '${table.id || 'table-' + Math.random().toString(36).substr(2, 9)}')">
+                        </div>
+                    `;
+                    tableContainer.insertBefore(searchDiv, table.closest('.table-responsive'));
+                }
+            });
+        }
+
+        function filterTable(input, tableId) {
+            const filter = input.value.toLowerCase();
+            const table = input.closest('.card-body').querySelector('table');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
+            });
+        }
+
+        function downloadHTML() {
+            const htmlContent = document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'survey_analysis_report.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function shareReport() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Survey Data Analysis Report',
+                    text: 'Check out this data analysis report',
+                    url: window.location.href
+                });
+            } else {
+                // Fallback: copy URL to clipboard
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                    const toast = document.createElement('div');
+                    toast.className = 'position-fixed top-0 end-0 p-3';
+                    toast.style.zIndex = '1050';
+                    toast.innerHTML = `
+                        <div class="toast show" role="alert">
+                            <div class="toast-body bg-success text-white rounded">
+                                <i class="fas fa-check me-2"></i>Link copied to clipboard!
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    setTimeout(() => document.body.removeChild(toast), 3000);
+                });
+            }
+        }
+
+        function initializeCollapsibles() {
+            // Add smooth transitions to collapsible elements
+            const collapseElements = document.querySelectorAll('.collapse');
+            collapseElements.forEach(element => {
+                element.addEventListener('show.bs.collapse', function() {
+                    const button = document.querySelector(`[data-bs-target="#${this.id}"]`);
+                    if (button) {
+                        const icon = button.querySelector('i');
+                        if (icon) icon.className = icon.className.replace('fa-chevron-down', 'fa-chevron-up');
+                    }
+                });
+                
+                element.addEventListener('hide.bs.collapse', function() {
+                    const button = document.querySelector(`[data-bs-target="#${this.id}"]`);
+                    if (button) {
+                        const icon = button.querySelector('i');
+                        if (icon) icon.className = icon.className.replace('fa-chevron-up', 'fa-chevron-down');
+                    }
+                });
+            });
+        }
+
+        // Print optimization
+        window.addEventListener('beforeprint', function() {
+            // Expand all collapsed sections for printing
+            const collapseElements = document.querySelectorAll('.collapse:not(.show)');
+            collapseElements.forEach(element => {
+                element.classList.add('show');
+                element.setAttribute('data-was-collapsed', 'true');
+            });
+        });
+
+        window.addEventListener('afterprint', function() {
+            // Restore collapsed state after printing
+            const expandedElements = document.querySelectorAll('.collapse[data-was-collapsed="true"]');
+            expandedElements.forEach(element => {
+                element.classList.remove('show');
+                element.removeAttribute('data-was-collapsed');
+            });
+        });
+    </script>
+</body>
+</html>
