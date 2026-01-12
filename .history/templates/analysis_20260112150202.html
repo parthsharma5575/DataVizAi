@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}Configure Analysis - DataVizAI{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js for outlier method visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+/* Outlier method cards styling */
+.outlier-method-card {
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.outlier-method-card:hover {
+    border-color: var(--primary-color);
+    background: rgba(20, 100, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.outlier-method-card.selected {
+    border-color: var(--primary-color);
+    background: rgba(20, 100, 255, 0.15);
+}
+
+.accuracy-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.accuracy-high { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.accuracy-medium { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.accuracy-low { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.method-details {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 0.5rem;
+}
+
+.recommended-badge {
+    background: linear-gradient(45deg, #ff6b6b, #ffa500);
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Configure Analysis Parameters
+                    </h4>
+                    <span class="badge bg-primary">{{ session.original_filename }}</span>
+                </div>
+                <div class="card-body">
+                    {% if step == 'configure' %}
+                    <!-- File Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-file-alt fa-2x mb-2"></i>
+                                    <h5>{{ session.total_rows }}</h5>
+                                    <small>Total Rows</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-columns fa-2x mb-2"></i>
+                                    <h5>{{ session.total_columns }}</h5>
+                                    <small>Total Columns</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-hdd fa-2x mb-2"></i>
+                                    <h5>{{ "%.1f"|format(session.file_size / 1024) }} KB</h5>
+                                    <small>File Size</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-clock fa-2x mb-2"></i>
+                                    <h5>{{ session.upload_time.strftime('%H:%M') }}</h5>
+                                    <small>Upload Time</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Cleaning Configuration -->
+                    <form method="POST" action="{{ url_for('process_data', session_id=session.id) }}">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-broom me-2"></i>Data Cleaning Options</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <!-- Missing Values Handling -->
+                                        <div class="mb-3">
+                                            <label for="imputation_method" class="form-label">Missing Values Handling:</label>
+                                            <select class="form-select" name="imputation_method" id="imputation_method">
+                                                <option value="mean">Fill with Mean</option>
+                                                <option value="median">Fill with Median</option>
+                                                <option value="mode">Fill with Mode</option>
+                                                <option value="knn">KNN Imputation</option>
+                                                <option value="none">Skip Missing Values</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Enhanced Outlier Detection -->
+                                        <div class="mb-4">
+                                            <label class="form-label">
+                                                <i class="fas fa-search me-2"></i>Outlier Detection Methods
+                                                <span class="loading-spinner" id="outlierLoadingSpinner" style="display: none;"></span>
+                                            </label>
+                                            <div class="form-text mb-3">AI-powered analysis estimates accuracy for your dataset. Select the best method below:</div>
+                                            
+                                            <!-- Outlier Method Cards Container -->
+                                            <div id="outlierMethodsContainer">
+                                                <div class="text-center text-muted py-4">
+                                                    <div class="loading-spinner"></div>
+                                                    <p class="mt-2">Analyzing your dataset to estimate outlier detection accuracy...</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Hidden input for selected method -->
+                                            
+                                            <!-- Manual Override Section -->
+                                            <div class="mt-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="showAllMethods">
+                                                    <label class="form-check-label text-muted" for="showAllMethods">
+                                                        Show all methods (including low-accuracy options)
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Validation Rules -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Validation Rules:</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="validation_rules" value="no_negative_values" id="no_negative">
+                                                <label class="form-check-label" for="no_negative">
+                                                    Check for negative values
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="validation_rules" value="required_columns" id="required_cols">
+                                                <label class="form-check-label" for="required_cols">
+                                                    Validate required columns
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="validation_rules" value="data_consistency" id="data_consistency">
+                                                <label class="form-check-label" for="data_consistency">
+                                                    Check data consistency
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-weight-hanging me-2"></i>Survey Weights Configuration</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" name="apply_weights" id="apply_weights">
+                                            <label class="form-check-label" for="apply_weights">
+                                                Apply survey weights to analysis
+                                            </label>
+                                        </div>
+
+                                        <div class="mb-3" id="weight_column_div" style="display: none;">
+                                            <label for="weight_column" class="form-label">Weight Column:</label>
+                                            <select class="form-select" name="weight_column" id="weight_column">
+                                                <option value="">Select weight column...</option>
+                                                {% for col_name, col_info in columns_info.items() %}
+                                                    {% if col_info.is_numeric %}
+                                                    <option value="{{ col_name }}">{{ col_name }} ({{ col_info.dtype }})</option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="alert alert-info">
+                                            <small>
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Survey weights adjust for sampling bias and improve representativeness of results.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Column Information -->
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h5><i class="fas fa-table me-2"></i>Column Overview</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Column Name</th>
+                                                <th>Data Type</th>
+                                                <th>Missing Values</th>
+                                                <th>Unique Values</th>
+                                                <th>Sample Values</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for col_name, col_info in columns_info.items() %}
+                                            <tr>
+                                                <td><strong>{{ col_name }}</strong></td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ col_info.dtype }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if col_info.null_count > 0 %}
+                                                    <span class="badge bg-warning">{{ col_info.null_count }}</span>
+                                                    {% else %}
+                                                    <span class="badge bg-success">0</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ col_info.unique_count }}</td>
+                                                <td>
+                                                    <small class="text-muted">
+                                                        {{ col_info.sample_values[:3]|join(', ') }}...
+                                                    </small>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play me-2"></i>
+                                Start Data Analysis
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show/hide weight column selector based on checkbox
+document.getElementById('apply_weights').addEventListener('change', function() {
+    const weightDiv = document.getElementById('weight_column_div');
+    if (this.checked) {
+        weightDiv.style.display = 'block';
+    } else {
+        weightDiv.style.display = 'none';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Load outlier detection analysis when page loads
+    const sessionId = {{ session.id }};
+    loadOutlierAnalysis(sessionId);
+});
+
+function loadOutlierAnalysis(sessionId) {
+    fetch(`/api/outlier_analysis/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayOutlierMethods(data.analysis);
+            } else {
+                showOutlierError(data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading outlier analysis:', error);
+            showOutlierError('Failed to load outlier analysis');
+        });
+}
+
+function displayOutlierMethods(analysis) {
+    const container = document.getElementById('outlierMethodsContainer');
+    const methodEstimates = analysis.method_estimates;
+    const recommended = analysis.recommended_method;
+    
+    if (Object.keys(methodEstimates).length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                No outlier detection methods could be analyzed for this dataset.
+                <p class="mb-0 mt-2">This might be due to insufficient numeric data.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let methodsHtml = '';
+    
+    // Add data quality summary
+    if (analysis.overall_data_quality) {
+        const quality = analysis.overall_data_quality;
+        methodsHtml += `
+            <div class="alert alert-info mb-3">
+                <strong>Dataset Quality Assessment:</strong> ${quality.overall}
+                <br><small>Missing values: ${quality.missing_percentage}% | Distribution quality: ${quality.distributions}</small>
+            </div>
+        `;
+    }
+    
+    // Sort methods by estimated accuracy
+    const sortedMethods = Object.entries(methodEstimates)
+        .filter(([_, estimate]) => !estimate.error)
+        .sort(([,a], [,b]) => (b.estimated_full_accuracy || 0) - (a.estimated_full_accuracy || 0));
+    
+    // Display top methods first
+    sortedMethods.forEach(([methodKey, estimate], index) => {
+        const isRecommended = recommended.method === methodKey;
+        const accuracy = estimate.estimated_full_accuracy || 0;
+        const confidence = estimate.confidence_level || 'low';
+        
+        const accuracyClass = accuracy >= 75 ? 'accuracy-high' : accuracy >= 60 ? 'accuracy-medium' : 'accuracy-low';
+        const confidenceIcon = confidence === 'high' ? 'fas fa-check-circle text-success' : 
+                              confidence === 'medium' ? 'fas fa-info-circle text-warning' : 
+                              'fas fa-exclamation-circle text-danger';
+        
+        // Hide low-accuracy methods by default unless "show all" is checked
+        const shouldHide = accuracy < 50 && index > 3;
+        const hideClass = shouldHide ? 'low-accuracy-method' : '';
+        
+        methodsHtml += `
+            <div class="outlier-method-card ${hideClass}" data-method="${methodKey}" ${shouldHide ? 'style="display: none;"' : ''}>
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">
+                            <input type="radio" name="outlier_method" value="${methodKey}" 
+                                   id="method_${methodKey}" class="form-check-input me-2"
+                                   ${index === 0 ? 'checked' : ''}>
+                            <label for="method_${methodKey}" class="form-check-label">
+                                ${estimate.display_name}
+                                ${isRecommended ? '<span class="recommended-badge">RECOMMENDED</span>' : ''}
+                            </label>
+                        </h6>
+                        <div class="method-details">
+                            <i class="${confidenceIcon} me-1"></i>
+                            Estimated accuracy: <strong>${accuracy.toFixed(1)}%</strong> 
+                            (confidence: ${confidence})
+                            <br>
+                            <small>Estimated outliers: ${estimate.estimated_outliers_count || 0} 
+                            (${estimate.sample_outlier_percentage || 0}% of dataset)</small>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="accuracy-badge ${accuracyClass}">${accuracy.toFixed(0)}%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = methodsHtml;
+    
+    // Add event listeners for method selection
+    document.querySelectorAll('input[name="outlier_method"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            // Update visual selection
+            document.querySelectorAll('.outlier-method-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            this.closest('.outlier-method-card').classList.add('selected');
+            
+            // Update help text
+            updateOutlierHelp(this.value);
+        });
+    });
+    
+    // Update help text for initially checked method
+    const checkedRadio = document.querySelector('input[name="outlier_method"]:checked');
+    if (checkedRadio) {
+        updateOutlierHelp(checkedRadio.value);
+    }
+    
+    // Select first method by default
+    if (sortedMethods.length > 0) {
+        const firstMethod = sortedMethods[0][0];
+        document.querySelector(`[data-method="${firstMethod}"]`).classList.add('selected');
+    }
+    
+    // Add show/hide toggle for low-accuracy methods
+    const showAllCheckbox = document.getElementById('showAllMethods');
+    showAllCheckbox.addEventListener('change', function() {
+        const lowAccuracyMethods = document.querySelectorAll('.low-accuracy-method');
+        lowAccuracyMethods.forEach(method => {
+            method.style.display = this.checked ? 'block' : 'none';
+        });
+    });
+}
+
+function showOutlierError(errorMessage) {
+    const container = document.getElementById('outlierMethodsContainer');
+    container.innerHTML = `
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Analysis Error:</strong> ${errorMessage}
+            <br><small>Falling back to standard IQR outlier detection method.</small>
+        </div>
+        <div class="outlier-method-card selected" data-method="iqr">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">
+                        <input type="radio" name="outlier_method" value="iqr" 
+                               id="method_iqr" class="form-check-input me-2" checked>
+                        <label for="method_iqr" class="form-check-label">
+                            Interquartile Range (IQR) <span class="recommended-badge">DEFAULT</span>
+                        </label>
+                    </h6>
+                    <div class="method-details">
+                        <i class="fas fa-info-circle text-info me-1"></i>
+                        Reliable baseline method for outlier detection
+                    </div>
+                </div>
+                <div class="text-end">
+                    <span class="accuracy-badge accuracy-medium">75%</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Set default method
+}
+</script>
+{% endblock %}
