@@ -207,6 +207,9 @@ def process_data(session_id):
         
         # Load and process data
         df = data_processor.load_data(filepath)
+        
+        # Calculate raw stats before cleaning
+        raw_stats = data_processor.calculate_summary_statistics(df)
 
         # Capture raw statistics before processing
         raw_stats = {
@@ -221,10 +224,24 @@ def process_data(session_id):
             df = data_processor.handle_missing_values(df, method=cleaning_config['imputation_method'])
         
         if cleaning_config['outlier_method'] != 'none':
-            df = data_processor.detect_and_handle_outliers(df, method=cleaning_config['outlier_method'])
+            df, outlier_info = data_processor.detect_and_handle_outliers(df, method=cleaning_config['outlier_method'])
+            total_outliers = 0
+            for key, info in outlier_info.items():
+                if isinstance(info, dict) and 'count' in info:
+                    total_outliers += info['count']
+            upload_session.outliers_detected = total_outliers
         
         # Apply validation rules
         validation_results = data_processor.apply_validation_rules(df, cleaning_config['validation_rules'])
+        
+        # Assess data quality
+        quality_score = data_processor.get_data_quality_score(df)
+        
+        # Calculate summary statistics
+        summary_stats = data_processor.calculate_summary_statistics(df)
+        
+        # Get AI insights
+        ai_insights = gemini_service.analyze_survey_data(df, summary_stats, raw_stats)
         
         # Save cleaned data for download
         cleaned_filename = f"cleaned_{upload_session.filename}"
@@ -272,7 +289,8 @@ def process_data(session_id):
             'quality_score': quality_score,
             'validation_results': validation_results,
             'ai_insights': ai_insights,
-            'raw_stats': raw_stats
+            'raw_stats': raw_stats,
+            'cleaning_config': cleaning_config
         })
         db.session.commit()
         

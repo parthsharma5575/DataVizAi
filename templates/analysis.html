@@ -166,7 +166,6 @@
                                             </div>
                                             
                                             <!-- Hidden input for selected method -->
-                                            <input type="hidden" name="outlier_method" id="selectedOutlierMethod" value="iqr">
                                             
                                             <!-- Manual Override Section -->
                                             <div class="mt-3">
@@ -388,7 +387,7 @@ function displayOutlierMethods(analysis) {
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <h6 class="mb-1">
-                            <input type="radio" name="outlier_method_radio" value="${methodKey}" 
+                            <input type="radio" name="outlier_method" value="${methodKey}" 
                                    id="method_${methodKey}" class="form-check-input me-2"
                                    ${index === 0 ? 'checked' : ''}>
                             <label for="method_${methodKey}" class="form-check-label">
@@ -416,23 +415,28 @@ function displayOutlierMethods(analysis) {
     container.innerHTML = methodsHtml;
     
     // Add event listeners for method selection
-    document.querySelectorAll('input[name="outlier_method_radio"]').forEach(radio => {
+    document.querySelectorAll('input[name="outlier_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            // Update hidden input
-            document.getElementById('selectedOutlierMethod').value = this.value;
-            
             // Update visual selection
             document.querySelectorAll('.outlier-method-card').forEach(card => {
                 card.classList.remove('selected');
             });
             this.closest('.outlier-method-card').classList.add('selected');
+            
+            // Update help text
+            updateOutlierHelp(this.value);
         });
     });
+    
+    // Update help text for initially checked method
+    const checkedRadio = document.querySelector('input[name="outlier_method"]:checked');
+    if (checkedRadio) {
+        updateOutlierHelp(checkedRadio.value);
+    }
     
     // Select first method by default
     if (sortedMethods.length > 0) {
         const firstMethod = sortedMethods[0][0];
-        document.getElementById('selectedOutlierMethod').value = firstMethod;
         document.querySelector(`[data-method="${firstMethod}"]`).classList.add('selected');
     }
     
@@ -458,7 +462,7 @@ function showOutlierError(errorMessage) {
             <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
                     <h6 class="mb-1">
-                        <input type="radio" name="outlier_method_radio" value="iqr" 
+                        <input type="radio" name="outlier_method" value="iqr" 
                                id="method_iqr" class="form-check-input me-2" checked>
                         <label for="method_iqr" class="form-check-label">
                             Interquartile Range (IQR) <span class="recommended-badge">DEFAULT</span>
@@ -477,7 +481,6 @@ function showOutlierError(errorMessage) {
     `;
     
     // Set default method
-    document.getElementById('selectedOutlierMethod').value = 'iqr';
 }
 </script>
 {% endblock %}

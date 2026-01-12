@@ -667,8 +667,13 @@ function updateImputationHelp(method) {
 function updateOutlierHelp(method) {
     const helpTexts = {
         'iqr': 'Identifies outliers using the Interquartile Range method (Q1 - 1.5*IQR, Q3 + 1.5*IQR).',
-        'zscore': 'Identifies outliers using Z-Score method (values beyond ±3 standard deviations).',
+        'z_score': 'Identifies outliers using Z-Score method (values beyond ±3 standard deviations).',
         'winsorization': 'Caps extreme values at the 5th and 95th percentiles.',
+        'isolation_forest': 'Uses Isolation Forest algorithm to detect outliers (unsupervised ML method).',
+        'local_outlier_factor': 'Uses Local Outlier Factor (LOF) to detect outliers based on local density.',
+        'modified_z_score': 'Identifies outliers using Modified Z-Score method (based on Median Absolute Deviation).',
+        'dbscan': 'Uses DBSCAN clustering to identify outliers as points not belonging to any cluster.',
+        'percentile': 'Identifies outliers based on percentile thresholds (1st and 99th percentiles).',
         'none': 'Skips outlier detection and handling.'
     };
 

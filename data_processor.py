@@ -5,6 +5,7 @@ from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
 import logging
 from json_utils import safe_json_serialize
+from outlier_detector import OutlierDetector
 
 logger = logging.getLogger(__name__)
 
@@ -117,46 +118,80 @@ class DataProcessor:
         
         numeric_columns = df_cleaned.select_dtypes(include=[np.number]).columns
         
-        for col in numeric_columns:
-            col_data = df_cleaned[col].dropna()
-            outliers = []
-            
-            if method == 'iqr':
-                Q1 = col_data.quantile(0.25)
-                Q3 = col_data.quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - 1.5 * IQR
-                upper_bound = Q3 + 1.5 * IQR
-                outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
-                
-            elif method == 'zscore':
-                z_scores = np.abs(stats.zscore(col_data))
-                outliers = col_data[z_scores > 3]
-                lower_bound = col_data.mean() - 3 * col_data.std()
-                upper_bound = col_data.mean() + 3 * col_data.std()
-                
-            elif method == 'winsorization':
-                # Winsorize at 5% and 95% percentiles
-                lower_bound = col_data.quantile(0.05)
-                upper_bound = col_data.quantile(0.95)
-                outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
-            
-            if len(outliers) > 0:
-                outlier_info[col] = {
-                    'count': len(outliers),
-                    'percentage': (len(outliers) / len(col_data)) * 100,
-                    'values': outliers.tolist()[:10]  # Store first 10 outliers
+        if method in ['isolation_forest', 'local_outlier_factor', 'dbscan']:
+            # Use OutlierDetector for ML methods
+            detector = OutlierDetector()
+            outlier_mask = detector.detection_methods[method](df_cleaned[numeric_columns])
+            outlier_count = np.sum(outlier_mask)
+            if outlier_count > 0:
+                outlier_info['ml_method'] = {
+                    'count': int(outlier_count),
+                    'percentage': (outlier_count / len(df_cleaned)) * 100,
+                    'method': method
                 }
+                if action == 'remove':
+                    df_cleaned = df_cleaned[~outlier_mask]
+                # For cap, do nothing as ML methods don't have bounds
+        else:
+            # Per-column detection for statistical methods
+            for col in numeric_columns:
+                col_data = df_cleaned[col].dropna()
+                outliers = []
+                lower_bound = None
+                upper_bound = None
                 
-                if action == 'cap':
-                    df_cleaned[col] = df_cleaned[col].clip(lower=lower_bound, upper=upper_bound)
-                elif action == 'remove':
-                    # Mark outliers for removal (but don't remove yet to maintain indices)
-                    outlier_mask = (df_cleaned[col] < lower_bound) | (df_cleaned[col] > upper_bound)
-                    df_cleaned.loc[outlier_mask, col] = np.nan
+                if method == 'iqr':
+                    Q1 = col_data.quantile(0.25)
+                    Q3 = col_data.quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - 1.5 * IQR
+                    upper_bound = Q3 + 1.5 * IQR
+                    outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
+                    
+                elif method == 'z_score':
+                    z_scores = np.abs(stats.zscore(col_data))
+                    threshold = 3.0
+                    outliers = col_data[z_scores > threshold]
+                    lower_bound = col_data.mean() - threshold * col_data.std()
+                    upper_bound = col_data.mean() + threshold * col_data.std()
+                    
+                elif method == 'modified_z_score':
+                    from scipy.stats import median_abs_deviation
+                    mad = median_abs_deviation(col_data, nan_policy='omit')
+                    median = col_data.median()
+                    modified_z = 0.6745 * (col_data - median) / mad
+                    threshold = 3.5
+                    outliers = col_data[np.abs(modified_z) > threshold]
+                    lower_bound = median - (threshold / 0.6745) * mad
+                    upper_bound = median + (threshold / 0.6745) * mad
+                    
+                elif method == 'percentile':
+                    lower_percentile = 1
+                    upper_percentile = 99
+                    lower_bound = col_data.quantile(lower_percentile / 100)
+                    upper_bound = col_data.quantile(upper_percentile / 100)
+                    outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
+                    
+                elif method == 'winsorization':
+                    lower_bound = col_data.quantile(0.05)
+                    upper_bound = col_data.quantile(0.95)
+                    outliers = col_data[(col_data < lower_bound) | (col_data > upper_bound)]
+                
+                if len(outliers) > 0:
+                    outlier_info[col] = {
+                        'count': len(outliers),
+                        'percentage': (len(outliers) / len(col_data)) * 100,
+                        'values': outliers.tolist()[:10]  # Store first 10 outliers
+                    }
+                    
+                    if action == 'cap' and lower_bound is not None and upper_bound is not None:
+                        df_cleaned[col] = df_cleaned[col].clip(lower=lower_bound, upper=upper_bound)
+                    elif action == 'remove':
+                        outlier_mask = (df_cleaned[col] < lower_bound) | (df_cleaned[col] > upper_bound)
+                        df_cleaned.loc[outlier_mask, col] = np.nan
         
         logger.info(f"Outlier detection completed. Found outliers in {len(outlier_info)} columns")
-        return df_cleaned
+        return df_cleaned, outlier_info
     
     def apply_validation_rules(self, df, rules):
         """Apply custom validation rules to the data"""
